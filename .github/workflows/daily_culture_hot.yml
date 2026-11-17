@@ -1,0 +1,45 @@
+name: 每日文化热点生成与推送
+
+on:
+  # 每天北京时间 11:45 自动运行（UTC 时间 03:45），确保 12:00 前更新完毕
+  schedule:
+    - cron: '45 3 * * *'
+  # 支持在 GitHub 页面手动点击 "Run workflow" 立即测试
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  send-culture-hot:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 拉取代码
+        uses: actions/checkout@v4
+
+      - name: 配置 Python 环境
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: 安装依赖
+        run: pip install -r requirements.txt
+
+      - name: 抓取热搜 + DeepSeek 提炼 + 生成网页/推送
+        env:
+          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+          # 以下为可选（免费QQ邮箱推送到微信，或PushPlus推送，不填也能直接用免费GitHub网页版）
+          SMTP_USER: ${{ secrets.SMTP_USER }}
+          SMTP_PASS: ${{ secrets.SMTP_PASS }}
+          RECEIVER_EMAIL: ${{ secrets.RECEIVER_EMAIL }}
+          PUSHPLUS_TOKEN: ${{ secrets.PUSHPLUS_TOKEN }}
+          PUSHPLUS_TOPIC: ${{ secrets.PUSHPLUS_TOPIC }}
+        run: python main.py
+
+      - name: 自动更新今日热点网页 (index.html)
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add index.html latest_report.html
+          git diff --staged --quiet || git commit -m "自动更新今日文化热点汇报"
+          git push
